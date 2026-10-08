@@ -1,5 +1,6 @@
 (() => {
-  const telegramUrl = 'https://t.me/coiathii';
+  const telegramUrl = 'https://t.me/svetaserm';
+  const requestEndpoint = 'https://shiny-smoke-e2b6.moiseevasveta990.workers.dev/';
 
   document.querySelectorAll('[data-telegram]').forEach((link) => {
     link.href = telegramUrl;
@@ -211,12 +212,50 @@
       activeStep = Math.max(1, activeStep - 1);
       renderStep();
     });
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!validateCurrent()) return;
+      const data = new FormData(form);
+      const payload = {
+        max_phone: data.get('max_phone')?.trim() || '',
+        telegram: data.get('telegram')?.trim() || '',
+        volume: data.get('volume')?.trim() || '',
+        platforms: data.getAll('platforms[]').filter(Boolean),
+        message: data.get('message')?.trim() || '',
+        page: window.location.href,
+      };
+
       if (formStatus) {
         formStatus.hidden = false;
-        formStatus.textContent = 'Заявка подготовлена. Подключим отправку в бот на следующем этапе.';
+        formStatus.textContent = requestEndpoint
+          ? 'Отправляем заявку...'
+          : 'Отправка в Telegram почти готова. Осталось подключить URL Cloudflare Worker.';
+      }
+      if (!requestEndpoint) return;
+
+      submit.disabled = true;
+      try {
+        const response = await fetch(requestEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) throw new Error('Request failed');
+        form.reset();
+        additionalPlatformList?.replaceChildren();
+        activeStep = 1;
+        renderStep();
+        if (formStatus) {
+          formStatus.hidden = false;
+          formStatus.textContent = 'Заявка отправлена. Скоро свяжемся с вами.';
+        }
+      } catch (error) {
+        if (formStatus) {
+          formStatus.hidden = false;
+          formStatus.textContent = 'Не удалось отправить заявку. Напишите нам в Telegram.';
+        }
+      } finally {
+        submit.disabled = false;
       }
     });
     renderStep();
